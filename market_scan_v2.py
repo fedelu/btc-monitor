@@ -127,9 +127,16 @@ def atr(klines, period=14):
     return out
 
 
-def load_klines_from_binance(interval, limit=100):
-    url = f"https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval={interval}&limit={limit}"
-    raw = http_json(url)
+def load_klines_from_bybit(interval_minutes, limit=100):
+    url = (
+        f"https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT"
+        f"&interval={interval_minutes}&limit={limit}"
+    )
+    resp = http_json(url)
+    if not isinstance(resp, dict) or "result" not in resp or "list" not in resp["result"]:
+        raise RuntimeError(f"Bybit kline response shape inesperada: {resp}")
+    raw = list(resp["result"]["list"])
+    raw.reverse()  # Bybit viene newest-first; alineamos a oldest-first como Binance
     return [
         {
             "open": float(x[1]),
@@ -138,8 +145,8 @@ def load_klines_from_binance(interval, limit=100):
             "close": float(x[4]),
             "vol": float(x[5]),
             "t_open_ms": int(x[0]),
-            "t_close_ms": int(x[6]),
-            "t": datetime.fromtimestamp(x[0] / 1000, tz=timezone.utc).isoformat(),
+            "t_close_ms": int(x[0]) + interval_minutes * 60000,
+            "t": datetime.fromtimestamp(int(x[0]) / 1000, tz=timezone.utc).isoformat(),
         }
         for x in raw
     ]
@@ -980,8 +987,8 @@ def main():
     day_vol_usd = float(btc["dayNtlVlm"])
 
     # Klines
-    k1h = load_klines_from_binance("1h", 100)
-    k15 = load_klines_from_binance("15m", 100)
+    k1h = load_klines_from_bybit(60, 100)
+    k15 = load_klines_from_bybit(15, 100)
     cl1 = [x["close"] for x in k1h]
     cl15 = [x["close"] for x in k15]
 
