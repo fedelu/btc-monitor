@@ -127,16 +127,7 @@ def atr(klines, period=14):
     return out
 
 
-def load_klines_from_bybit(interval_minutes, limit=100):
-    url = (
-        f"https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT"
-        f"&interval={interval_minutes}&limit={limit}"
-    )
-    resp = http_json(url)
-    if not isinstance(resp, dict) or "result" not in resp or "list" not in resp["result"]:
-        raise RuntimeError(f"Bybit kline response shape inesperada: {resp}")
-    raw = list(resp["result"]["list"])
-    raw.reverse()  # Bybit viene newest-first; alineamos a oldest-first como Binance
+def _normalize_kline_rows(raw, interval_minutes):
     return [
         {
             "open": float(x[1]),
@@ -150,6 +141,47 @@ def load_klines_from_bybit(interval_minutes, limit=100):
         }
         for x in raw
     ]
+
+
+def load_klines_from_bybit(interval_minutes, limit=100):
+    url = (
+        f"https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT"
+        f"&interval={interval_minutes}&limit={limit}"
+    )
+    resp = http_json(url)
+    if not isinstance(resp, dict) or "result" not in resp or "list" not in resp["result"]:
+        raise RuntimeError(f"Bybit kline response shape inesperada: {resp}")
+    raw = list(resp["result"]["list"])
+    raw.reverse()
+    return _normalize_kline_rows(raw, interval_minutes)
+
+
+def load_klines_from_okx(interval_minutes, limit=100):
+    bar_map = {1: "1m", 3: "3m", 5: "5m", 15: "15m", 30: "30m", 60: "1H", 120: "2H", 240: "4H"}
+    bar = bar_map.get(interval_minutes)
+    if bar is None:
+        raise RuntimeError(f"OKX bar no soportado para interval_minutes={interval_minutes}")
+    url = (
+        f"https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP"
+        f"&bar={bar}&limit={limit}"
+    )
+    resp = http_json(url)
+    if not isinstance(resp, dict) or "data" not in resp:
+        raise RuntimeError(f"OKX kline response shape inesperada: {resp}")
+    raw = list(resp["data"])
+    raw.reverse()
+    return _normalize_kline_rows(raw, interval_minutes)
+
+
+def load_klines(interval_minutes, limit=100):
+    """Try Bybit first; fallback a OKX si Bybit falla (p.ej. 403 desde GH Actions)."""
+    last_err = None
+    for fn in (load_klines_from_bybit, load_klines_from_okx):
+        try:
+            return fn(interval_minutes, limit)
+        except Exception as e:
+            last_err = e
+    raise RuntimeError(f"No se pudo obtener klines de ningun source: {last_err}")
 
 
 # ---------------------------------------------------------------------------
@@ -987,8 +1019,8 @@ def main():
     day_vol_usd = float(btc["dayNtlVlm"])
 
     # Klines
-    k1h = load_klines_from_bybit(60, 100)
-    k15 = load_klines_from_bybit(15, 100)
+    k1h = load_klines(60, 100)
+    k15 = load_klines(15, 100)
     cl1 = [x["close"] for x in k1h]
     cl15 = [x["close"] for x in k15]
 
