@@ -173,10 +173,31 @@ def load_klines_from_okx(interval_minutes, limit=100):
     return _normalize_kline_rows(raw, interval_minutes)
 
 
+def load_klines_from_hyperliquid(interval_minutes, limit=100):
+    interval_map = {1: "1m", 3: "3m", 5: "5m", 15: "15m", 30: "30m", 60: "1h", 120: "2h", 240: "4h"}
+    interval = interval_map.get(interval_minutes)
+    if interval is None:
+        raise RuntimeError(f"HL interval no soportado para interval_minutes={interval_minutes}")
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    start_ms = now_ms - (limit + 2) * interval_minutes * 60_000
+    resp = http_json(
+        "https://api.hyperliquid.xyz/info",
+        method="POST",
+        body={
+            "type": "candleSnapshot",
+            "req": {"coin": "BTC", "interval": interval, "startTime": start_ms, "endTime": now_ms},
+        },
+    )
+    if not isinstance(resp, list):
+        raise RuntimeError(f"HL kline response shape inesperada: {resp}")
+    rows = [[c["t"], c["o"], c["h"], c["l"], c["c"], c["v"]] for c in resp[-limit:]]
+    return _normalize_kline_rows(rows, interval_minutes)
+
+
 def load_klines(interval_minutes, limit=100):
-    """Try Bybit first; fallback a OKX si Bybit falla (p.ej. 403 desde GH Actions)."""
+    """Try Bybit -> OKX -> Hyperliquid (todos los exchanges asiaticos geo-bloquean GH Actions)."""
     last_err = None
-    for fn in (load_klines_from_bybit, load_klines_from_okx):
+    for fn in (load_klines_from_bybit, load_klines_from_okx, load_klines_from_hyperliquid):
         try:
             return fn(interval_minutes, limit)
         except Exception as e:
