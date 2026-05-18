@@ -50,10 +50,11 @@ NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
 ALERT_STATE_PATH = os.path.join(SCRIPT_DIR, ".alert_state.json")  # evita alertas duplicadas
 
 # Risk profile (ajustable desde acá)
-# Profile activo: A (subido 2026-05-13). Capital $150, margin $75, leverage 3x.
-# Risk per trade: 1.5% del capital ($2.25). Antes era 1% ($1.50).
-NOTIONAL_USD = 225        # margin 75 * leverage 3
-MAX_RISK_USD = 2.25       # 1.5% del capital de $150
+# Profile activo: B (subido 2026-05-18). Capital $150, margin $150, leverage 3x.
+# Risk per trade: 3% del capital ($4.50). Antes Opción A era 1.5% ($2.25).
+# Notional 2x del original ($225 -> $450), margin 2x ($75 -> $150).
+NOTIONAL_USD = 450        # margin 150 * leverage 3
+MAX_RISK_USD = 4.50       # 3% del capital de $150
 MIN_SIGNALS = 3
 MIN_RR = 2.5              # con TP 1:3, R/R nominal es 3.0
 TP_RATIO = 3              # TP1 a 3x el stop
