@@ -49,12 +49,13 @@ NTFY_TOPIC = "duke-sol-bullish"
 NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
 ALERT_STATE_PATH = os.path.join(SCRIPT_DIR, ".alert_state_sol.json")  # evita alertas duplicadas
 
-# Risk profile (ajustable desde acá)
-# Profile activo: B (subido 2026-05-18). Capital $150, margin $150, leverage 3x.
-# Risk per trade: 3% del capital ($4.50). Antes Opción A era 1.5% ($2.25).
-# Notional 2x del original ($225 -> $450), margin 2x ($75 -> $150).
+# Risk profile SOL unificado a Opción B (2026-05-25)
+# Capital $150, leverage 3x, notional $450 (mismo que BTC/ETH).
+# Risk por trade $4.50 (3% capital, unificado con BTC/ETH).
+# Razón: validado con 4 SOL trades ganadores en el journal, Federico viene operando
+# consistente con notional ~$500. Decisión consciente de mantener mismo perfil cross-asset.
 NOTIONAL_USD = 450        # margin 150 * leverage 3
-MAX_RISK_USD = 4.50       # 3% del capital de $150
+MAX_RISK_USD = 4.50       # 3% del capital de $150 (unificado con perfil B)
 MIN_SIGNALS = 3
 MIN_RR = 2.5              # con TP 1:3, R/R nominal es 3.0
 TP_RATIO = 3              # TP1 a 3x el stop
@@ -469,10 +470,11 @@ def extreme_rsi_flags(mkt):
     rsi15 = mkt["tf_15m"]["rsi14"]
     pos = mkt["range_48h"]["position_pct"]
     return {
-        "oversold_extreme": rsi1h < 30 and rsi15 < 30,
-        "overbought_extreme": rsi1h > 70 and rsi15 > 70,
-        "bear_trap_risk": rsi1h < 30 and pos < 5,
-        "bull_trap_risk": rsi1h > 70 and pos > 95,
+        # SOL calibration: thresholds 25/75 (SOL llega a extremos más profundos)
+        "oversold_extreme": rsi1h < 25 and rsi15 < 25,
+        "overbought_extreme": rsi1h > 75 and rsi15 > 75,
+        "bear_trap_risk": rsi1h < 25 and pos < 5,
+        "bull_trap_risk": rsi1h > 75 and pos > 95,
     }
 
 
